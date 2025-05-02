@@ -9,7 +9,7 @@ Don't set up an Arduino or suchlike with a 3000hz blinking RGB LED.
 
 Don't set the RGB LED to those values in the bottom right.
 
-Don't hold the LED over the tattoo for about a minute to cause photonic agitation.
+Don't hold the LED over the tattoo for about a minute to cause resonant photonic agitation.
 
 Don't do any of this as the tattoo ink migrates to surface of the skin over about 2-4 weeks, and makes a small shallow easily healed wound.
 
