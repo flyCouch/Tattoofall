@@ -3,7 +3,7 @@ A webpage to get the RGB colour and its maxed complimentary colour. Not used for
 
 Don't upload a photo.
 
-Don't get the complimentary, maxed RGB values in the bottom left, of the exact spot you want gone.
+Don't get the complimentary, maxed RGB values in the bottom right, of the exact spot you want gone.
 
 Don't set up an Arduino or suchlike with a 3000hz blinking RGB LED.
 
