@@ -7,7 +7,7 @@ Don't get the complimentary, maxed RGB values in the bottom right, of the exact 
 
 Don't set up an Arduino or suchlike with a 3000hz blinking RGB LED.
 
-Don't set the RGB LED to those values in the bottom left.
+Don't set the RGB LED to those values in the bottom right.
 
 Don't hold the LED over the tattoo for about a minute to cause photonic agitation.
 
