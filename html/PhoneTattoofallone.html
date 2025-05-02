@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tattoofall</title>
+<style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Align items to the top */
+            align-items: center; /* Center items horizontally */
+            min-height: 100vh;
+            background-color: #d4edda;
+            position: relative; /* For absolute positioning of other elements */
+        }
+
+        h1 {
+            margin-top: 20px; /* Add some space below the top */
+            color: darkgreen;
+            font-size: 48px;
+        }
+
+        #container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            border: 2px solid black;
+            margin-top: 20px; /* Add space below the heading */
+        }
+
+        #uploadButton {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 10;
+            margin-top: 20px; /* Add space below the canvas */
+        }
+
+        #rgbDisplay, #comprgbDisplay {
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 5px;
+            border-radius: 5px;
+            margin-top: 5px;
+            margin-bottom: 25px; /* Add bottom margin */
+            text-align: center;
+            width: fit-content;
+        }
+
+        #copyright {
+            position: absolute;
+            bottom: 10px; /* Keep it at the bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: Arial, sans-serif;
+            font-size: calc(10px + 0.5vw);
+            color: #000;
+            text-align: center;
+            width: 100%;
+        }
+
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tattoofall</h1>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+    </div>
+    <button id="uploadButton">Upload Image</button>
+    <div id="rgbDisplay">RGB: (0, 0, 0)</div>
+    <div id="comprgbDisplay">Comp. & Maxed RGB: (0, 0, 0)</div>
+    <div id="copyright">&copy; 2024 Ron Lyttle, All Rights Reserved.</div>
+    <input type="file" id="fileInput" accept="image/*">
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const rgbDisplay = document.getElementById('rgbDisplay');
+        const comprgbDisplay = document.getElementById('comprgbDisplay');
+        const mirrorStatus = document.getElementById('mirrorStatus');
+        const uploadButton = document.getElementById('uploadButton');
+        const fileInput = document.getElementById('fileInput');
+
+        let image = new Image();
+        let scale = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let startX, startY;
+        let mirror = false;
+
+        // Touch variables for pan and zoom
+        let initialPinchDistance = null;
+        let lastScale = scale;
+        let initialTouchX = null;
+        let initialTouchY = null;
+        let lastPanX = panX;
+        let lastPanY = panY;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent default touch events like scrolling
+
+            if (e.touches.length === 2) {
+                // Pinch zoom started
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+            } else if (e.touches.length === 1) {
+                // Panning started
+                initialTouchX = e.touches[0].clientX;
+                initialTouchY = e.touches[0].clientY;
+                lastPanX = panX;
+                lastPanY = panY;
+                isPanning = true;
+            }
+        }, { passive: false }); // passive: false is needed to preventDefault
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+
+            if (e.touches.length === 2 && initialPinchDistance !== null) {
+                // Pinch zoom
+                const currentPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const scaleFactor = currentPinchDistance / initialPinchDistance;
+                scale = Math.max(1, Math.min(3, lastScale * scaleFactor));
+                drawImage();
+            } else if (e.touches.length === 1 && isPanning) {
+                // Panning
+                const deltaX = e.touches[0].clientX - initialTouchX;
+                const deltaY = e.touches[0].clientY - initialTouchY;
+                panX = lastPanX + deltaX;
+                panY = lastPanY + deltaY;
+                drawImage();
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            initialPinchDistance = null;
+            lastScale = scale;
+            initialTouchX = null;
+            initialTouchY = null;
+            isPanning = false;
+        });
+
+        canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            initialPinchDistance = null;
+            lastScale = scale;
+            initialTouchX = null;
+            initialTouchY = null;
+            isPanning = false;
+        });
+
+        // Existing mouse wheel zoom remains for desktop
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 0.1;
+            const zoomDirection = e.deltaY < 0 ? 1 : -1;
+            scale = Math.max(1, Math.min(3, scale + zoomFactor * zoomDirection));
+            drawImage();
+        }, { passive: false });
+
+        // Existing mouse pan remains for desktop
+        canvas.addEventListener('mousedown', (e) => {
+            isPanning = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+                drawImage();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => isPanning = false);
+        canvas.addEventListener('mouseout', () => isPanning = false);
+
+        // Function to handle image loading
+        function handleImageLoad(file) {
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    image.src = e.target.result;
+                    image.onload = () => {
+                        drawImage();
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Event listener for the upload button to trigger the file input
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Event listener for the file input to handle the selected file
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            handleImageLoad(file);
+        });
+
+        // Load image and draw to canvas (removed drag and drop listeners)
+        document.addEventListener('DOMContentLoaded', () => {
+            // No more drag and drop listeners here
+        });
+
+        function drawImage() {
+            const { width, height } = getScaledDimensions(image.width, image.height, canvas.width, canvas.height);
+            canvas.width = 640;
+            canvas.height = 480;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(panX, panY);
+            ctx.scale(scale, scale);
+            ctx.drawImage(image, 0, 0, width, height);
+            ctx.restore();
+            drawCrosshairs();
+            calculateAverageRGB();
+        }
+
+        function getScaledDimensions(imgWidth, imgHeight, maxWidth, maxHeight) {
+            const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
+            return {
+                width: imgWidth * ratio,
+                height: imgHeight * ratio
+            };
+        }
+
+        function drawCrosshairs() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const gap = 8; // Gap from the center
+
+            ctx.strokeStyle = 'green';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            // Vertical line stopping 30px short of the center
+            ctx.moveTo(centerX, 0);
+            ctx.lineTo(centerX, centerY - gap);
+            ctx.moveTo(centerX, canvas.height);
+            ctx.lineTo(centerX, centerY + gap);
+
+            // Horizontal line stopping 30px short of the center
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(centerX - gap, centerY);
+            ctx.moveTo(canvas.width, centerY);
+            ctx.lineTo(centerX + gap, centerY);
+
+            ctx.stroke();
+        }
+
+        function calculateAverageRGB() {
+            const centerX = Math.floor(canvas.width / 2);
+            const centerY = Math.floor(canvas.height / 2);
+            const boxSize = 10; // Size of the averaging box
+            const imageData = ctx.getImageData(centerX - boxSize / 2, centerY - boxSize / 2, boxSize, boxSize);
+            const data = imageData.data;
+
+            let r = 0, g = 0, b = 0;
+            const pixelCount = data.length / 4;
+
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i];
+                g += data[i + 1];
+                b += data[i + 2];
+            }
+
+            r = Math.floor(r / pixelCount);
+            g = Math.floor(g / pixelCount);
+            b = Math.floor(b / pixelCount);
+
+            // Set averaging box color based on average RGB
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+
+            rgbDisplay.textContent = `RGB: (${r}, ${g}, ${b})`;
+            processColors(r, g, b);
+
+            // Draw crosshairs and averaging box (existing code)
+            drawCrosshairs();
+            ctx.fillRect(centerX - boxSize / 2, centerY - boxSize / 2, boxSize, boxSize);
+        }
+
+        // Zoom functionality
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 0.1;
+            if (e.deltaY < 0) {
+                scale = Math.min(3, scale + zoomFactor); // Zoom in
+            } else {
+                scale = Math.max(1, scale - zoomFactor); // Zoom out
+            }
+            drawImage();
+        });
+
+        // Panning functionality
+        canvas.addEventListener('mousedown', (e) => {
+            isPanning = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+                drawImage();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => isPanning = false);
+        canvas.addEventListener('mouseout', () => isPanning = false);
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'm') {
+                mirror = !mirror;
+                canvas.style.transform = mirror ? 'scaleX(-1)' : 'none'; // Mirror canvas
+                mirrorStatus.textContent = mirror ? 'Mirroring: ON' : 'Press "M" to mirror';
+                drawImage(); // Redraw image to apply mirroring
+            }
+        });
+
+        function RGBtoHSV(r, g, b) {
+            let r_f = r / 255.0;
+            let g_f = g / 255.0;
+            let b_f = b / 255.0;
+
+            let cmax = Math.max(r_f, g_f, b_f);
+            let cmin = Math.min(r_f, g_f, b_f);
+            let delta = cmax - cmin;
+
+            let h = 0, s = 1, v = 1;
+
+            if (delta != 0) {
+                s = delta / cmax;
+                if (cmax == r_f) {
+                    h = 60 * (((g_f - b_f) / delta) % 6);
+                } else if (cmax == g_f) {
+                    h = 60 * (((b_f - r_f) / delta) + 2);
+                } else if (cmax == b_f) {
+                    h = 60 * (((r_f - g_f) / delta) + 4);
+                }
+            }
+
+            if (h < 0) h += 360;
+
+            return { h, s, v };
+        }
+
+        function HSVtoRGB(h, s, v) {
+            let r = 0, g = 0, b = 0;
+
+            if (s == 0) {
+                r = g = b = v; // achromatic
+            } else {
+                let h_ = h / 60;
+                let i = Math.floor(h_);
+                let f = h_ - i;
+                let p = v * (1 - s);
+                let q = v * (1 - s * f);
+                let t = v * (1 - s * (1 - f));
+
+                switch (i) {
+                    case 0:
+                        r = v; g = t; b = p;
+                        break;
+                    case 1:
+                        r = q; g = v; b = p;
+                        break;
+                    case 2:
+                        r = p; g = v; b = t;
+                        break;
+                    case 3:
+                        r = p; g = q; b = v;
+                        break;
+                    case 4:
+                        r = t; g = p; b = v;
+                        break;
+                    case 5:
+                        r = v; g = p; b = q;
+                        break;
+                }
+            }
+
+            return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+        }
+
+        function processColors(r, g, b) {
+            const hsv = RGBtoHSV(r, g, b);
+            const compHSV = { h: (hsv.h + 180) % 360, s: hsv.s, v: hsv.v }; // Complementary color
+            const compRGB = HSVtoRGB(compHSV.h, compHSV.s, compHSV.v);
+
+            comprgbDisplay.textContent = `Comp. & Maxed RGB: (${compRGB.r}, ${compRGB.g}, ${compRGB.b})`;
+        }
+    </script>
+</body>
+</html>
