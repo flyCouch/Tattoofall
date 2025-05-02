@@ -1,5 +1,5 @@
 # Tattoofall
-A webpage to get the RGB colour and its maxed complimentary colour. Not used for tattoo removal.
+A webpage to get the RGB colour and its maxed complimentary colour. Not to be used for tattoo removal.
 
 Don't upload a photo.
 
