@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB Color Flasher</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden; /* Prevent scrolling */
+            display: flex;
+            flex-direction: column;
+            height: 100vh; /* Full viewport height */
+        }
+        /* Custom styling for input range slider track and thumb */
+        input[type='range']::-webkit-slider-runnable-track {
+            background: #d1d5db; /* Light gray track */
+            border-radius: 9999px; /* Fully rounded */
+            height: 8px;
+        }
+        input[type='range']::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4f46e5; /* Indigo thumb */
+            border-radius: 9999px;
+            cursor: pointer;
+            margin-top: -6px; /* Center thumb on track */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        /* Firefox specific styling */
+        input[type='range']::-moz-range-track {
+            background: #d1d5db;
+            border-radius: 9999px;
+            height: 8px;
+        }
+        input[type='range']::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4f46e5;
+            border-radius: 9999px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Top 4/5ths: Color Flashing Area -->
+    <div id="flash-area" class="flex-grow bg-black transition-colors duration-100" style="flex: 4;">
+        <!-- This area will flash the selected color -->
+    </div>
+
+    <!-- Bottom 1/5th: Control Panel -->
+    <div id="control-panel" class="bg-gray-800 text-white p-6 shadow-lg flex-none" style="flex: 1;">
+        <div class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center md:space-x-8 space-y-4 md:space-y-0 h-full">
+            
+            <!-- RGB Inputs -->
+            <div class="flex items-center space-x-3">
+                <label for="r-input" class="font-bold text-lg">R:</label>
+                <input type="number" id="r-input" min="0" max="255" value="255" 
+                       class="w-20 p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                
+                <label for="g-input" class="font-bold text-lg">G:</label>
+                <input type="number" id="g-input" min="0" max="255" value="0" 
+                       class="w-20 p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                
+                <label for="b-input" class="font-bold text-lg">B:</label>
+                <input type="number" id="b-input" min="0" max="255" value="0" 
+                       class="w-20 p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+            </div>
+
+            <!-- Rate Slider -->
+            <div class="flex flex-col items-center flex-grow">
+                <label for="rate-slider" class="block text-sm font-medium mb-2">Flash Rate (Hz): <span id="rate-value">10.0</span></label>
+                <input type="range" id="rate-slider" min="5" max="333" value="100" 
+                       class="w-full h-2 rounded-lg cursor-pointer accent-indigo-500">
+            </div>
+
+            <!-- Start/Stop Button -->
+            <button id="toggle-flash-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition duration-300 transform hover:scale-105">
+                Start Flashing
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Get DOM Elements ---
+        const flashArea = document.getElementById('flash-area');
+        const rInput = document.getElementById('r-input');
+        const gInput = document.getElementById('g-input');
+        const bInput = document.getElementById('b-input');
+        const rateSlider = document.getElementById('rate-slider');
+        const rateValueSpan = document.getElementById('rate-value');
+        const toggleFlashBtn = document.getElementById('toggle-flash-btn');
+
+        // --- State Variables ---
+        let flashIntervalId = null;
+        let isFlashing = false;
+        let flashColorOn = true; // True for the selected RGB, false for black (or transparent)
+
+        // --- Helper Functions ---
+
+        /**
+         * Clamps a value between a min and max.
+         * @param {number} value The value to clamp.
+         * @param {number} min The minimum allowed value.
+         * @param {number} max The maximum allowed value.
+         * @returns {number} The clamped value.
+         */
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(value, max));
+        }
+
+        /**
+         * Gets the current RGB color from the input fields, clamped to 0-255.
+         * @returns {string} CSS RGB color string (e.g., "rgb(255, 0, 0)").
+         */
+        function getRgbColor() {
+            const r = clamp(parseInt(rInput.value), 0, 255);
+            const g = clamp(parseInt(gInput.value), 0, 255);
+            const b = clamp(parseInt(bInput.value), 0, 255);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        /**
+         * Updates the background color of the flash area.
+         * If flashing is active, it toggles between the selected color and black.
+         * If not flashing, it just sets the selected color.
+         */
+        function updateFlashAreaColor() {
+            if (isFlashing) {
+                flashArea.style.backgroundColor = flashColorOn ? getRgbColor() : 'rgb(0,0,0)'; // Flash between color and black
+                flashColorOn = !flashColorOn; // Toggle for next flash
+            } else {
+                flashArea.style.backgroundColor = getRgbColor(); // Show solid color when not flashing
+            }
+        }
+
+        /**
+         * Starts the flashing interval.
+         */
+        function startFlashing() {
+            stopFlashing(); // Ensure any existing interval is cleared
+            // The slider value is now in milliseconds (period).
+            const periodMs = parseInt(rateSlider.value); 
+            
+            if (periodMs > 0) {
+                isFlashing = true;
+                flashColorOn = true; // Start with the color visible
+                updateFlashAreaColor(); // Set initial state
+                flashIntervalId = setInterval(updateFlashAreaColor, periodMs); // Use periodMs directly for setInterval
+                toggleFlashBtn.textContent = "Stop Flashing";
+                toggleFlashBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                toggleFlashBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                // If rate is 0 (or very close), just show the solid color
+                isFlashing = false;
+                updateFlashAreaColor();
+                toggleFlashBtn.textContent = "Start Flashing";
+                toggleFlashBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                toggleFlashBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+        }
+
+        /**
+         * Stops the flashing interval and sets the area to the solid selected color.
+         */
+        function stopFlashing() {
+            if (flashIntervalId !== null) {
+                clearInterval(flashIntervalId);
+                flashIntervalId = null;
+            }
+            isFlashing = false;
+            flashColorOn = true; // Reset for next start
+            updateFlashAreaColor(); // Set to solid color
+            toggleFlashBtn.textContent = "Start Flashing";
+            toggleFlashBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+            toggleFlashBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        }
+
+        /**
+         * Updates the Hz display based on the current millisecond period slider value.
+         */
+        function updateHzDisplay() {
+            const periodMs = parseInt(rateSlider.value);
+            // Calculate Hz = 1000 ms / period_ms
+            const frequencyHz = (1000 / periodMs).toFixed(1); // To one decimal place
+            rateValueSpan.textContent = frequencyHz;
+        }
+
+        // --- Event Listeners ---
+
+        // RGB Input change handlers
+        rInput.addEventListener('input', () => {
+            rInput.value = clamp(parseInt(rInput.value), 0, 255);
+            if (!isFlashing) { // Only update color if not flashing, otherwise interval handles it
+                updateFlashAreaColor();
+            }
+        });
+        gInput.addEventListener('input', () => {
+            gInput.value = clamp(parseInt(gInput.value), 0, 255);
+            if (!isFlashing) {
+                updateFlashAreaColor();
+            }
+        });
+        bInput.addEventListener('input', () => {
+            bInput.value = clamp(parseInt(bInput.value), 0, 255);
+            if (!isFlashing) {
+                updateFlashAreaColor();
+            }
+        });
+
+        // Rate slider change handler
+        rateSlider.addEventListener('input', () => {
+            updateHzDisplay(); // Update Hz display immediately
+            if (isFlashing) { // If currently flashing, restart with new rate
+                startFlashing();
+            }
+        });
+
+        // Toggle button click handler
+        toggleFlashBtn.addEventListener('click', () => {
+            if (isFlashing) {
+                stopFlashing();
+            } else {
+                startFlashing();
+            }
+        });
+
+        // --- Initial Setup on Page Load ---
+        window.onload = () => {
+            // Set initial color and stop any flashing
+            stopFlashing(); 
+            updateHzDisplay(); // Set initial Hz display
+        };
+    </script>
+</body>
+</html>
+
